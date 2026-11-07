@@ -704,7 +704,7 @@ final class Preferences: ObservableObject {
         tabLife = TabLife(rawValue: store.integer(forKey: "tabs.close.after")) ?? .never
         sleepPace = SleepPace.chosen
         lazyTabs = store.bool(forKey: "tabs.lazy")
-        newTabAfterLast = store.bool(forKey: "tabs.newAfterLast")
+        newTabAfterLast = store.object(forKey: "tabs.newAfterLast") as? Bool ?? Fork.defaultOn // Fork: on unless switched off
         closeGoesBack = store.bool(forKey: "tabs.closeGoesBack")
         newTabPlace = store.string(forKey: "tabs.newPlace").flatMap(NewTabPlace.init(rawValue:)) ?? .next
         startsFresh = store.bool(forKey: Preferences.freshKey)
@@ -767,7 +767,7 @@ final class Preferences: ObservableObject {
         // existed; they are not asked to sit through it.
         welcomed = store.bool(forKey: "welcomed") || store.object(forKey: "glyph") != nil
         usesSpaces = store.bool(forKey: "spaces")
-        profilesInOneWindow = store.bool(forKey: "profiles.oneWindow")
+        profilesInOneWindow = store.object(forKey: "profiles.oneWindow") as? Bool ?? Fork.defaultOn // Fork: on unless switched off
         listsPins = store.bool(forKey: "pins.list")
         // "Pins keep their site" is one switch over two keys (see
         // SettingsIndex): on when either was on, on by default when neither

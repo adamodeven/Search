@@ -33,4 +33,45 @@ enum Fork {
         #endif
         return URL(string: "https://github.com/\(repository)/releases/latest/download/\(name)")!
     }
+
+    /// The default for switches this fork turns on that upstream leaves off:
+    /// Profiles in one window, and Leave a new tab when the last tab closes.
+    static let defaultOn = true
+}
+
+// MARK: - the window stays
+
+@MainActor
+extension Fork {
+    /// ⌘W on a window's only tab, already blank: upstream closes the window.
+    /// Here the window stays, its new tab with it, the field ready to type
+    /// in. ⇧⌘W and the red button still close it.
+    static func keepWindow(_ browser: Browser, blank: Tab) {
+        browser.typed = ""
+        blank.draft = ""
+        browser.askFocus()
+    }
+}
+
+// MARK: - what this fork leaves out
+
+extension Fork {
+    /// Bookmarks, as a whole: the bar, the button, the menu, the commands,
+    /// the address field's suggestions from them, and bringing them in from
+    /// another browser. Upstream's code is left as it is, so a sync with
+    /// upstream doesn't conflict over it; nothing calls into it from here.
+    /// The bookmarks file already on disk is left alone too.
+    static let bookmarks = false
+
+    /// A command upstream lists that this fork leaves out: not in the menus,
+    /// not in Settings › Shortcuts, and its key goes on to the page.
+    static func hides(command id: String) -> Bool {
+        !bookmarks && id.hasPrefix("bookmarks.")
+    }
+
+    /// A row of Settings that this fork leaves out, on its page and in the
+    /// find field.
+    static func hides(setting id: String) -> Bool {
+        !bookmarks && id.hasPrefix("bookmarks.")
+    }
 }

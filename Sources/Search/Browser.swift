@@ -3820,7 +3820,7 @@ final class Browser: NSObject, ObservableObject {
 
         if tabs.count == 1 {
             if tab.isBlank {
-                NSApp.keyWindow?.performClose(nil)
+                Fork.keepWindow(self, blank: tab) // Fork: upstream closes the window here
             } else {
                 let fresh = Tab(configuration: Web.configuration(space: spaceID))
                 remember(tab, at: 0)
@@ -3860,7 +3860,7 @@ final class Browser: NSObject, ObservableObject {
                     editing = false
                     focusRequest += 1
                 } else {
-                    NSApp.keyWindow?.performClose(nil)
+                    Fork.keepWindow(self, blank: tab) // Fork: upstream closes the window here
                 }
                 return
             }
@@ -6072,7 +6072,7 @@ final class Browser: NSObject, ObservableObject {
             if list.count < 3, seen.insert(History.identity(for: place.url)).inserted { list.append(place) }
         }
         let front = visited.first.map { History.identity(for: $0.url) }
-        for kept in bookmarks.places(for: typed, limit: 3) {
+        for kept in Fork.bookmarks ? bookmarks.places(for: typed, limit: 3) : [] {
             if list.count == 2, let front, !seen.contains(front), History.identity(for: kept.url) != front { break }
             add(kept)
         }

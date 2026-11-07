@@ -1,0 +1,9 @@
+- tab trails like horse
+- spaces show in the bottom the same as arc
+- one window for all profiles the same as arc
+- remove bookmarks as a whole
+- remove Search password manager as a whole and fix the apple passwords integration
+- fix passkey integration
+- make the pinned tabs at the top auto-width to fit the width of the sidebar based on how many are pinned
+- mobile app?
+- dont close window when last tab closes

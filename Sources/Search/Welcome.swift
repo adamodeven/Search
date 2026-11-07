@@ -18,7 +18,7 @@ struct WelcomePanel: View {
     @State private var source: ImportSource?
     @State private var wantsPasswords = true
     @State private var wantsHistory = true
-    @State private var wantsBookmarks = true
+    @State private var wantsBookmarks = Fork.bookmarks
     @State private var bringing = false
     @State private var brought: String?
 
@@ -109,7 +109,7 @@ struct WelcomePanel: View {
                         Text("Passwords from \((source ?? sources[0]).name) aren't supported yet.")
                             .font(.system(size: 13)).foregroundStyle(Palette.muted)
                     }
-                    Choice("Bookmarks", "Folders and all, behind the bookmark button", on: $wantsBookmarks)
+                    if Fork.bookmarks { Choice("Bookmarks", "Folders and all, behind the bookmark button", on: $wantsBookmarks) }
                     Choice("History", "The last few thousand places, for finishing addresses", on: $wantsHistory)
                 }
 

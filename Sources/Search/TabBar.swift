@@ -176,7 +176,7 @@ struct TabBar: View {
                         if !browser.prefs.navigationLeft {
                             Helm(browser: browser).padding(.trailing, 8)
                         }
-                        BookmarkDoor(browser: browser, arrowEdge: .bottom)
+                        if Fork.bookmarks { BookmarkDoor(browser: browser, arrowEdge: .bottom) }
                     }
                     .background {
                         GeometryReader { box in

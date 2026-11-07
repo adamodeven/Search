@@ -410,7 +410,7 @@ enum SettingsIndex {
         switch item.id {
         case "privacy.clickIDs": return ClickIDs.possible
         case "privacy.gpc": return PrivacySignal.possible
-        default: return true
+        default: return !Fork.hides(setting: item.id)
         }
     }
 

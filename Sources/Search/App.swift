@@ -310,19 +310,21 @@ struct SearchApp: App {
                 Button("Stop Sound in Tab") { browser.pauseMedia() }
                     .shortcut("tabs.mute")
             }
-            CommandMenu("Bookmarks") {
-                Button(browser.pageKept ? "Edit Bookmark\u{2026}" : "Add This Page") { browser.bookmarkCurrent() }
-                    .shortcut("bookmarks.add")
-                    .disabled(!(browser.active?.isWeb ?? false))
-                Button("Show Bookmarks…") { browser.bookmarking = true }
-                    .shortcut("bookmarks.show")
-                Toggle("Show Bookmarks Bar", isOn: Binding(
-                    get: { browser.prefs.bookmarksBar },
-                    set: { on in withAnimation(Motion.glide) { browser.prefs.bookmarksBar = on } }
-                ))
-                .shortcut("bookmarks.bar")
-                // The bookmarks themselves follow, put in by AppKit (see
-                // BookmarkMenu in Bookmarks.swift).
+            if Fork.bookmarks { // Fork: no bookmarks
+                CommandMenu("Bookmarks") {
+                    Button(browser.pageKept ? "Edit Bookmark\u{2026}" : "Add This Page") { browser.bookmarkCurrent() }
+                        .shortcut("bookmarks.add")
+                        .disabled(!(browser.active?.isWeb ?? false))
+                    Button("Show Bookmarks…") { browser.bookmarking = true }
+                        .shortcut("bookmarks.show")
+                    Toggle("Show Bookmarks Bar", isOn: Binding(
+                        get: { browser.prefs.bookmarksBar },
+                        set: { on in withAnimation(Motion.glide) { browser.prefs.bookmarksBar = on } }
+                    ))
+                    .shortcut("bookmarks.bar")
+                    // The bookmarks themselves follow, put in by AppKit (see
+                    // BookmarkMenu in Bookmarks.swift).
+                }
             }
             CommandMenu("History") {
                 Section("Recently Visited") {
@@ -641,7 +643,7 @@ struct ContentView: View {
     /// The bookmarks bar is up: asked for, there are bookmarks, and the tabs
     /// aren't folded away or under a video filling the screen.
     private var barShown: Bool {
-        browser.prefs.bookmarksBar && !browser.bookmarks.isEmpty && !browser.folded
+        Fork.bookmarks && browser.prefs.bookmarksBar && !browser.bookmarks.isEmpty && !browser.folded
             && fullscreenTab == nil
     }
 
@@ -1497,6 +1499,7 @@ struct ContentView: View {
         if ShortcutStore.shared.anyChanged || browser.prefs.usesSpaces, let combo = KeyCombo(event: event) {
             if let command = ShortcutStore.shared.customCommand(on: combo) {
                 if command.section == .spaces, !browser.prefs.usesSpaces { return false }
+                if Fork.hides(command: command.id) { return false }
                 if Command.split.contains(command.id), !browser.prefs.splitView { return false }
                 if Command.ai.contains(command.id), !browser.prefs.ai { return false }
                 if Command.dusk.contains(command.id), !browser.prefs.darkensPages { return false }
@@ -1630,7 +1633,7 @@ struct ContentView: View {
         case "s" where !shifted:
             // The column or the strip, folded away (see Fold.swift).
             browser.toggleFold()
-        case "b" where shifted:
+        case "b" where shifted && Fork.bookmarks: // Fork: no bookmarks
             browser.bookmarkCurrent()
         case "," where !shifted:
             browser.tuning = true

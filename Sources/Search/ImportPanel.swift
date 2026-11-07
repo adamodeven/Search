@@ -27,7 +27,7 @@ struct ImportPanel: View {
     @State private var previews: [String: ImportSource.Preview] = [:]
 
     @State private var wantsPasswords = true
-    @State private var wantsBookmarks = true
+    @State private var wantsBookmarks = Fork.bookmarks
     @State private var wantsHistory = true
     @State private var wantsExtensions = false
     /// What came from this browser before goes, and its bookmarks come
@@ -289,9 +289,11 @@ struct ImportPanel: View {
                  : "Read from \(source.name)'s own files, unless it has a primary password") {
                 option($wantsPasswords, none: !source.importsPasswords || preview?.passwords == 0)
             }
-            Rule()
-            Line("Bookmarks", preview?.bookmarks == 0 ? "None in \(source.name)" : "In a “\(source.name)” folder, or at the top if you have none yet") {
-                option($wantsBookmarks, none: preview?.bookmarks == 0)
+            if Fork.bookmarks { // Fork: no bookmarks
+                Rule()
+                Line("Bookmarks", preview?.bookmarks == 0 ? "None in \(source.name)" : "In a “\(source.name)” folder, or at the top if you have none yet") {
+                    option($wantsBookmarks, none: preview?.bookmarks == 0)
+                }
             }
             // Brought before: only what is new comes, unless what came from
             // it last time is to go first. An import from before this was

@@ -108,9 +108,12 @@ struct TrailIndent: ViewModifier {
 
     func body(content: Content) -> some View {
         if let place, place.trailed {
-            HStack(spacing: 0) {
-                Color.clear.frame(width: CGFloat(place.depth) * Trails.step)
-                ZStack {
+            // Padding and an overlay, not a stack: the row keeps exactly its
+            // own height, as the column's measured steps expect.
+            let gutter = CGFloat(place.depth) * Trails.step
+            content
+                .padding(.leading, gutter + Trails.step)
+                .overlay(alignment: .leading) {
                     if place.leads {
                         Button { withAnimation(Motion.reduced ? nil : .easeOut(duration: 0.18)) { Trails.shared.toggle(tab) } } label: {
                             Image(systemName: "chevron.right")
@@ -123,11 +126,9 @@ struct TrailIndent: ViewModifier {
                         .buttonStyle(.plain)
                         .onHover { hovering = $0 }
                         .help(place.folded ? "Show the tabs opened from here" : "Fold away the tabs opened from here")
+                        .padding(.leading, gutter)
                     }
                 }
-                .frame(width: Trails.step)
-                content
-            }
         } else {
             content
         }

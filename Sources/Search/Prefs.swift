@@ -762,7 +762,7 @@ final class Preferences: ObservableObject {
         asksWhereToSave = store.bool(forKey: "downloads.ask")
         savesPasswords = store.object(forKey: "passwords.save") as? Bool ?? true
         fillsPasswords = store.object(forKey: "passwords.fill") as? Bool ?? true
-        applePasswords = store.object(forKey: "passwords.apple") as? Bool ?? Fork.defaultOn // Fork: on unless switched off
+        applePasswords = store.object(forKey: "passwords.apple") as? Bool ?? Fork.passwordsPage // Fork: on when it can work
         // Anyone who already has a session was here before the welcome
         // existed; they are not asked to sit through it.
         welcomed = store.bool(forKey: "welcomed") || store.object(forKey: "glyph") != nil

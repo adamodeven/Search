@@ -879,7 +879,7 @@ final class Browser: NSObject, ObservableObject {
         // ordinary tab only, asked about by its own host. Paired, its names
         // join the list when the helper answers; not yet, a row offers to
         // connect.
-        let appleHost = prefs.applePasswords && prefs.fillsPasswords && passwords
+        let appleHost = Fork.passwordsPage && prefs.applePasswords && prefs.fillsPasswords && passwords // Fork
             ? ApplePasswords.offers(on: tab.pageAddress, privateTab: tab.shy) : nil
         let apple = applePasswords
         let connect = appleHost != nil && apple.state == .idle && applePairing?.tab != tab.id
@@ -891,7 +891,7 @@ final class Browser: NSObject, ObservableObject {
                 for: .init(page: tab.pageAddress, privateTab: tab.shy, frameHost: tab.fieldFrameHost,
                            passwords: passwords, kept: known.count),
                 .init(appleOn: prefs.applePasswords, fills: prefs.fillsPasswords,
-                      helper: ApplePasswordsOffer.benchHelper ?? ApplePasswordsOffer.helperHere,
+                      helper: ApplePasswordsOffer.benchHelper ?? (Fork.passwordsPage && ApplePasswordsOffer.helperHere), // Fork
                       testRun: Store.testing, benchAsks: ApplePasswordsOffer.benchAsks))
         }()
         appleAsk += 1

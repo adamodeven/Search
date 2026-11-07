@@ -906,7 +906,7 @@ private struct SideFoot: View {
             .padding(.bottom, 8)
         } else {
             // Fork: every space in a row above the doors (SpaceRow.swift).
-            SpaceRow(browser: browser)
+            if SpaceRow.shows(browser) { SpaceRow(browser: browser) }
             HStack(spacing: 2) {
                 if Profiles.shared.several { ProfileBadge(browser: browser) }
                 if prefs.usesSpaces, !SpaceRow.shows(browser) { SpaceDot(browser: browser) }

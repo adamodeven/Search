@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 // What makes this build Adam's fork and not Office Commun's Search.
 //
@@ -70,6 +71,21 @@ extension Fork {
     /// the keychain under Search's name are left where they are.
     static let vault = false
 
+    /// Settings › Passwords, Apple Passwords and passkeys: only in a build
+    /// that has Apple's browser entitlement
+    /// (com.apple.developer.web-browser.public-key-credential) in a
+    /// provisioning profile of this fork's team. Without it macOS kills
+    /// Apple's Passwords helper as it starts — its launch constraint admits
+    /// only named browsers and apps with that entitlement — and WebKit
+    /// offers no passkeys. Nothing on the page can work until then.
+    static let passwordsPage: Bool = {
+        guard let task = SecTaskCreateFromSelf(nil) else { return false }
+        let value = SecTaskCopyValueForEntitlement(
+            task, "com.apple.developer.web-browser.public-key-credential" as CFString, nil
+        )
+        return (value as? Bool) == true
+    }()
+
     /// A command upstream lists that this fork leaves out: not in the menus,
     /// not in Settings › Shortcuts, and its key goes on to the page.
     static func hides(command id: String) -> Bool {
@@ -79,6 +95,8 @@ extension Fork {
     /// A row of Settings that this fork leaves out, on its page and in the
     /// find field.
     static func hides(setting id: String) -> Bool {
-        (!bookmarks && id.hasPrefix("bookmarks.")) || (!vault && ["passwords.open", "passwords.save"].contains(id))
+        (!bookmarks && id.hasPrefix("bookmarks."))
+            || (!vault && ["passwords.open", "passwords.save"].contains(id))
+            || (!passwordsPage && (id.hasPrefix("passwords.") || id == "passkeys"))
     }
 }

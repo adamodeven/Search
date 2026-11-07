@@ -30,7 +30,8 @@ final class OneWindowTests: XCTestCase {
         let saved = Store.settings.object(forKey: "profiles.oneWindow")
         defer { Store.settings.set(saved, forKey: "profiles.oneWindow") }
         Store.settings.removeObject(forKey: "profiles.oneWindow")
-        XCTAssertFalse(Preferences().profilesInOneWindow)
+        // Fork: on unless switched off (Fork.defaultOn).
+        XCTAssertEqual(Preferences().profilesInOneWindow, Fork.defaultOn)
         for words in ["profiles in one window", "one window", "single window"] {
             XCTAssertTrue(SettingsIndex.find(words).contains { $0.id == "profiles.oneWindow" }, words)
         }

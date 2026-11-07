@@ -26,7 +26,7 @@ struct ImportPanel: View {
     @State private var chosen: [String: String] = [:]
     @State private var previews: [String: ImportSource.Preview] = [:]
 
-    @State private var wantsPasswords = true
+    @State private var wantsPasswords = Fork.vault
     @State private var wantsBookmarks = Fork.bookmarks
     @State private var wantsHistory = true
     @State private var wantsExtensions = false
@@ -284,10 +284,12 @@ struct ImportPanel: View {
                 Rule()
             }
             // A kind the browser has none of is said so, and can't be picked.
-            Line("Passwords", !source.importsPasswords ? "Not supported for \(source.name)" : preview?.passwords == 0 ? "None in \(source.name)" : source.asksForKey
-                 ? "macOS asks once for \(source.name)'s keychain key"
-                 : "Read from \(source.name)'s own files, unless it has a primary password") {
-                option($wantsPasswords, none: !source.importsPasswords || preview?.passwords == 0)
+            if Fork.vault { // Fork: no vault
+                Line("Passwords", !source.importsPasswords ? "Not supported for \(source.name)" : preview?.passwords == 0 ? "None in \(source.name)" : source.asksForKey
+                     ? "macOS asks once for \(source.name)'s keychain key"
+                     : "Read from \(source.name)'s own files, unless it has a primary password") {
+                    option($wantsPasswords, none: !source.importsPasswords || preview?.passwords == 0)
+                }
             }
             if Fork.bookmarks { // Fork: no bookmarks
                 Rule()

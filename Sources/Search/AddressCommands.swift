@@ -44,6 +44,7 @@ enum AddressCommand: CaseIterable, Equatable {
         switch self {
         case .newSpace: return browser.prefs.usesSpaces
         case .bookmarks: return Fork.bookmarks
+        case .passwords: return Fork.vault
         default: return true
         }
     }

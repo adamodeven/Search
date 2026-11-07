@@ -365,8 +365,10 @@ struct SearchApp: App {
                     .shortcut("app.settings")
                 Button("Welcome…") { browser.welcoming = true }
                     .shortcut("app.welcome")
-                Button("Passwords…") { browser.managing = true }
-                    .shortcut("app.passwords")
+                if Fork.vault { // Fork: no vault
+                    Button("Passwords…") { browser.managing = true }
+                        .shortcut("app.passwords")
+                }
             }
             QuitAndHelp()
         }

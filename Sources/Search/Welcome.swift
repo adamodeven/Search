@@ -16,7 +16,7 @@ struct WelcomePanel: View {
     // value that ran every time the panel was made, the first window's
     // included, for a page that isn't showing yet.
     @State private var source: ImportSource?
-    @State private var wantsPasswords = true
+    @State private var wantsPasswords = Fork.vault
     @State private var wantsHistory = true
     @State private var wantsBookmarks = Fork.bookmarks
     @State private var bringing = false
@@ -103,11 +103,13 @@ struct WelcomePanel: View {
                             .font(.system(size: 13))
                             .foregroundStyle(Palette.muted)
                     }
-                    if importsPasswords {
-                        Choice("Passwords", "macOS will ask once for that browser's keychain key", on: $wantsPasswords)
-                    } else {
-                        Text("Passwords from \((source ?? sources[0]).name) aren't supported yet.")
-                            .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                    if Fork.vault { // Fork: no vault
+                        if importsPasswords {
+                            Choice("Passwords", "macOS will ask once for that browser's keychain key", on: $wantsPasswords)
+                        } else {
+                            Text("Passwords from \((source ?? sources[0]).name) aren't supported yet.")
+                                .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                        }
                     }
                     if Fork.bookmarks { Choice("Bookmarks", "Folders and all, behind the bookmark button", on: $wantsBookmarks) }
                     Choice("History", "The last few thousand places, for finishing addresses", on: $wantsHistory)

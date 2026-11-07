@@ -865,7 +865,7 @@ final class Browser: NSObject, ObservableObject {
         // alone has no password to put anywhere. A box that only might be a
         // sign-in's gets this host's own accounts, never the rest of the
         // site's: console.cloud.google.com's project name is not Gmail's.
-        var kept = prefs.fillsPasswords && passwords
+        var kept = Fork.vault && prefs.fillsPasswords && passwords // Fork: no vault
             ? Vault.kept(matching: host, wide: wide).filter { !inTheClear || $0.clear } : []
         // The account whose name the step before was sent with comes first:
         // the password page of a sign-in that asks for the name first.
@@ -1136,7 +1136,7 @@ final class Browser: NSObject, ObservableObject {
     /// Passwords, in a tab. The list is read again each time it is asked for.
     var managing: Bool {
         get { pageTab(.passwords) != nil }
-        set { if newValue { show(InternalPage(.passwords)) } else { putAway(.passwords) } }
+        set { if newValue { if Fork.vault { show(InternalPage(.passwords)) } } else { putAway(.passwords) } } // Fork: no vault
     }
     /// The list, without secrets: see `Kept` and `Vault.all()`.
     @Published private(set) var saved: [Kept] = []
@@ -5747,7 +5747,7 @@ final class Browser: NSObject, ObservableObject {
 
         tab.onCredentials = { [weak self] tab, host, user, password, clear in
             // an extension's own page isn't a site: Bitwarden's unlock pin was offered as its password.
-            guard let self, prefs.savesPasswords, !password.isEmpty, !tab.shy,
+            guard let self, Fork.vault, prefs.savesPasswords, !password.isEmpty, !tab.shy, // Fork: no vault
                   !Vault.isNever(host), tab.address.flatMap(Browser.extensionHost(of:)) == nil
             else { return }
             // A password manager extension that asked Chrome's way to do the

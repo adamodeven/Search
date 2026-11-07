@@ -63,15 +63,22 @@ extension Fork {
     /// The bookmarks file already on disk is left alone too.
     static let bookmarks = false
 
+    /// Search's own password store, as a whole: its Passwords page, the offer
+    /// to save a password after a sign-in, filling from it, and bringing
+    /// passwords in from another browser. Sign-ins are filled from Apple's
+    /// Passwords app instead (on unless switched off). Passwords already in
+    /// the keychain under Search's name are left where they are.
+    static let vault = false
+
     /// A command upstream lists that this fork leaves out: not in the menus,
     /// not in Settings › Shortcuts, and its key goes on to the page.
     static func hides(command id: String) -> Bool {
-        !bookmarks && id.hasPrefix("bookmarks.")
+        (!bookmarks && id.hasPrefix("bookmarks.")) || (!vault && id == "app.passwords")
     }
 
     /// A row of Settings that this fork leaves out, on its page and in the
     /// find field.
     static func hides(setting id: String) -> Bool {
-        !bookmarks && id.hasPrefix("bookmarks.")
+        (!bookmarks && id.hasPrefix("bookmarks.")) || (!vault && ["passwords.open", "passwords.save"].contains(id))
     }
 }

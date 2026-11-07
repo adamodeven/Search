@@ -4888,6 +4888,7 @@ final class Browser: NSObject, ObservableObject {
         if prefs.usesTabGroups, let source, !tab.shy, !tab.bench { tab.groupID = source.groupID }
         tabs.insert(tab, at: atEnd ? tabs.count : link ? placeForLink(from: source) : placeForNew())
         if link, !atEnd, !foreground { noteLink(tab, from: source) }
+        if link, !atEnd { Trails.shared.note(tab.id, from: source?.id) } // Fork: tab trails
         if mayWait, !foreground, prefs.lazyTabs, page == nil {
             tab.restore(url: url, title: "")
         } else {
@@ -6814,6 +6815,7 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
         let tab = Tab(shy: opener.shy, configuration: configuration)
         tab.popup = popup
         tab.opener = from
+        Trails.shared.note(tab.id, from: from) // Fork: tab trails
         if clicked { opener.popupGesture.opened(tab.id) }
         if prefs.popupWindows, windowFeatures.width != nil || windowFeatures.height != nil {
             let sourceSpace = parked.first { $0.value.tabs.contains { $0 === opener } }?.key ?? spaceID

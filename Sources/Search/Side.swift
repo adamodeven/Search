@@ -9,6 +9,7 @@ import SwiftUI
 struct SideBar: View {
     @ObservedObject var browser: Browser
     @ObservedObject var prefs: Preferences
+    @ObservedObject private var trails = Trails.shared // Fork: tab trails
     /// On the window's ground, beside the page's card (see CardEdge): the
     /// ground's colour and no edge of its own, the card's edge being the line.
     var onFrame = false
@@ -640,7 +641,8 @@ struct SideBar: View {
             // the row's, so a row that has just moved keeps its bearings.
             // Worked out once, not by every row: each look walks the whole
             // row, and 300 rows asking made redrawing the column quadratic.
-            let loose = looseTabs
+            let every = looseTabs
+            let (loose, trail) = trails.lay(every, active: browser.activeID) // Fork: tab trails
             // Under the groups: Clear keeps them, as it keeps the pins, so
             // everything above the line is what stays.
             if showsLine(kept: keptCount, listed: browser.listedPins.count, loose: loose.count) {
@@ -659,6 +661,7 @@ struct SideBar: View {
                         rowItem(tab, tabs: browser.tabs, splits: browser.splits,
                                 activeID: browser.activeID, interactive: true, pill: pill,
                                 close: { browser.closeTab(tab) })
+                        .modifier(TrailIndent(place: trail[tab.id], tab: tab.id)) // Fork: tab trails
                         // Positions here are among the loose rows; the pinned block
                         // sits in front of them in the real list.
                         .modifier(Carried(index: index, steps: looseSteps, vertical: true,
@@ -667,10 +670,11 @@ struct SideBar: View {
                                           outside: { browser.dragOut(tab) }, browser: browser, tab: tab,
                                           cross: { cross(tab, $0, from: .rows) },
                                           land: { land(tab, $0) }, faded: crossing?.tab == tab.id) {
+                            let to = Trails.index($0, shown: loose, all: every) // Fork: tab trails
                             if prefs.usesTabGroups {
-                                browser.move(tab, within: nil, to: $0)
+                                browser.move(tab, within: nil, to: to)
                             } else {
-                                browser.moveDisplayedTab(tab, to: $0 + browser.pinnedCount)
+                                browser.moveDisplayedTab(tab, to: to + browser.pinnedCount)
                             }
                         })
                     }

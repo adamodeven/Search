@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Security
 
 // What makes this build Adam's fork and not Office Commun's Search.
@@ -63,6 +63,21 @@ extension Fork {
     /// upstream doesn't conflict over it; nothing calls into it from here.
     /// The bookmarks file already on disk is left alone too.
     static let bookmarks = false
+
+    /// Upstream's Move Left and Move Right in a space's menu. Off: spaces are
+    /// dragged in the row instead, in an order of this fork's own.
+    static let upstreamSpaceMoves = false
+
+    /// Groups in the column drawn as folders: a tab's height, a folder icon
+    /// where a tab has its site's (TabGroups.swift).
+    static let folders = true
+
+    /// ⌘1–⌘9 go to spaces and ⌃1–⌃9 to tabs; upstream has it the other way
+    /// round. Changing a space's key in Settings › Shortcuts still works.
+    static let numbersSwapped = true
+
+    /// What, held, shows each tab's number beside it.
+    static var tabNumbersHeldWith: NSEvent.ModifierFlags { numbersSwapped ? .control : .command }
 
     /// Search's own password store, as a whole: its Passwords page, the offer
     /// to save a password after a sign-in, filling from it, and bringing

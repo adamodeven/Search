@@ -435,7 +435,7 @@ struct SideBar: View {
             : displayed.filter { $0.pin == nil }
         // A pair is two lines (see SplitTabItem).
         let pairs = rows.filter { browser.split(for: $0) != nil }.count
-        let heading = icons ? GroupHeading.compactHeight : GroupHeading.height
+        let heading = icons ? GroupHeading.compactHeight : Fork.folders ? rowHeight : GroupHeading.height // Fork: folders
         // A folded group showing none of its tabs still has its empty stack
         // of them under its heading, and the gap after it.
         let headings = CGFloat(grouped.count) * (heading + SideBar.gap)

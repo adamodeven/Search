@@ -22,7 +22,7 @@ final class ShortcutTests: XCTestCase {
 
     func testSpaceKeysCanMoveClearResetAndReload() {
         let store = ShortcutStore()
-        let original = KeyCombo("1", command: false, control: true)
+        let original = spaceKey("1")
         let replacement = KeyCombo("1", option: true)
         XCTAssertEqual(store.customCommand(on: original)?.id, "spaces.1")
         store.assign(replacement, to: "spaces.1")
@@ -75,9 +75,9 @@ final class ShortcutTests: XCTestCase {
 
     func testConflictsWithSpaceKeysUseExistingReassignmentAndReset() {
         let store = ShortcutStore()
-        let original = KeyCombo("2", command: false, control: true)
+        let original = spaceKey("2")
         XCTAssertFalse(KeyCombo.isReserved(original))
-        XCTAssertTrue(KeyCombo.isReserved(KeyCombo("2")))
+        XCTAssertTrue(KeyCombo.isReserved(tabKey("2")))
         XCTAssertTrue(KeyCombo.isReserved(KeyCombo("c")))
         XCTAssertEqual(store.owner(of: original, except: "tabs.next")?.id, "spaces.2")
         store.assign(original, to: "tabs.next")
@@ -188,4 +188,14 @@ private final class LinkAction: WKNavigationAction {
     override var buttonNumber: Int { 1 }
     override var targetFrame: WKFrameInfo? { nil }
     override var shouldPerformDownload: Bool { download }
+}
+
+/// Fork: a space's default key and a tab's, as this build has them
+/// (Fork.numbersSwapped: ⌘ for spaces, ⌃ for tabs).
+private func spaceKey(_ n: String) -> KeyCombo {
+    Fork.numbersSwapped ? KeyCombo(n) : KeyCombo(n, command: false, control: true)
+}
+
+private func tabKey(_ n: String) -> KeyCombo {
+    Fork.numbersSwapped ? KeyCombo(n, command: false, control: true) : KeyCombo(n)
 }

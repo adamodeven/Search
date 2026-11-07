@@ -96,7 +96,7 @@ final class TabShortcutHintTests: XCTestCase {
             prefs.splitView = saved.3
         }
         try await settle()
-        try await flags(.command, in: window)
+        try await flags(Fork.tabNumbersHeldWith, in: window)
         XCTAssertTrue(browser.commandHeld)
         XCTAssertEqual(browser.tabShortcutNumbers.count, 9)
         for number in [2, 9] {
@@ -164,16 +164,16 @@ final class TabShortcutHintTests: XCTestCase {
         XCTAssertTrue(browser.tabGroups.first { $0.id == splitGroup }?.collapsed == true)
         try await flags([], in: window)
         XCTAssertFalse(browser.commandHeld)
-        try await flags(.command, in: window)
+        try await flags(Fork.tabNumbersHeldWith, in: window)
         NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: window)
         XCTAssertFalse(browser.commandHeld)
-        try await flags(.command, in: window)
+        try await flags(Fork.tabNumbersHeldWith, in: window)
         NotificationCenter.default.post(name: NSApplication.didResignActiveNotification, object: NSApp)
         XCTAssertFalse(browser.commandHeld)
-        try await flags(.command, in: window)
+        try await flags(Fork.tabNumbersHeldWith, in: window)
         prefs.showsTabShortcuts = false
         XCTAssertTrue(browser.tabShortcutNumbers.isEmpty)
-        try await flags(.command, in: window)
+        try await flags(Fork.tabNumbersHeldWith, in: window)
         XCTAssertFalse(browser.commandHeld)
     }
 
@@ -189,7 +189,7 @@ final class TabShortcutHintTests: XCTestCase {
         let codes: [UInt16] = [18, 19, 20, 21, 23, 22, 26, 28, 25]
         let characters = number == 2 ? "é" : String(number)
         let event = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero,
-            modifierFlags: .command, timestamp: ProcessInfo.processInfo.systemUptime,
+            modifierFlags: Fork.tabNumbersHeldWith, timestamp: ProcessInfo.processInfo.systemUptime,
             windowNumber: window.windowNumber, context: nil, characters: characters, charactersIgnoringModifiers: characters,
             isARepeat: false, keyCode: codes[number - 1]))
         XCTAssertNil(ContentView.keyHooks[ObjectIdentifier(browser)]?(event))

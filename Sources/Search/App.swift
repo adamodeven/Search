@@ -1152,7 +1152,7 @@ struct ContentView: View {
             // window).
             guard mine(event) else { return event }
             guard event.type == .keyDown else {
-                let held = browser.prefs.showsTabShortcuts && event.modifierFlags.contains(.command)
+                let held = browser.prefs.showsTabShortcuts && event.modifierFlags.contains(Fork.tabNumbersHeldWith) // Fork
                 if browser.commandHeld != held { browser.commandHeld = held }
                 // ⌃ let go of switches to the tab the switcher is on — or
                 // whichever its key is held with (Settings › Shortcuts).
@@ -1494,6 +1494,14 @@ struct ContentView: View {
                 return true
             }
             return false
+        }
+
+        // Fork: ⌃1–⌃9 for tabs, the ninth the last, as ⌘1–⌘9 are upstream;
+        // ⌘1–⌘9 go to spaces (Fork.numbersSwapped).
+        if Fork.numbersSwapped, flags.intersection([.command, .option, .control, .shift]) == [.control],
+           let number = ContentView.digits[event.keyCode], number > 0 {
+            browser.select(index: number == 9 ? browser.tabShortcutTargets.count - 1 : number - 1)
+            return true
         }
 
         // Space keys have no menu; other commands arrive here when rebound.

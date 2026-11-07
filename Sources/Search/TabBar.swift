@@ -1029,6 +1029,7 @@ struct Carried: ViewModifier {
                             CarryGuard.open(ticket, end: callOff)
                         }
                         travel = vertical ? value.translation.height : value.translation.width
+                        if let browser { SpaceDrops.shared.track(browser) } // Fork: tabs to a space's icon
                         // Asked every move, so the block it left lets go
                         // of it as soon as it is elsewhere.
                         let crossed = cross?(value.location) == true
@@ -1051,6 +1052,14 @@ struct Carried: ViewModifier {
                         // Already put down (see callOff): a press that
                         // came after can't be where it was let go.
                         guard CarryGuard.close(ticket) else { return }
+                        // Fork: let go over a space's icon, it goes there (TabsToSpace.swift).
+                        if let browser, let tab, SpaceDrops.shared.take(tab, in: browser) {
+                            if browser.prefs.splitView { _ = TabDrag.shared.finish(browser: browser, tab: tab) }
+                            _ = land?(nil)
+                            if reordered { move(from) }
+                            withAnimation(Motion.settle) { held = false; travel = 0; reordered = false }
+                            return
+                        }
                         if let browser, let tab, browser.prefs.splitView {
                             let finished = TabDrag.shared.finish(browser: browser, tab: tab)
                             let source = finished.source
@@ -1432,7 +1441,7 @@ struct TabMenu: View {
             Menu("Move to Space") {
                 ForEach(browser.spaces.filter { $0.id != browser.spaceID }) { space in
                     Button {
-                        browser.move(tab, toSpace: space.id)
+                        browser.moveToSpace(tab, space.id) // Fork: every picked tab
                     } label: {
                         Label(space.name, systemImage: space.symbol)
                     }
@@ -1440,7 +1449,7 @@ struct TabMenu: View {
                 if browser.spaces.count > 1 { Divider() }
                 Button("New Space…") {
                     browser.askForSpace { space in
-                        browser.move(tab, toSpace: space.id) {
+                        browser.moveToSpace(tab, space.id) { // Fork: every picked tab
                             browser.switchSpace(to: space.id)
                         }
                     }

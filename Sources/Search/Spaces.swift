@@ -616,7 +616,7 @@ enum SpaceMenu {
         actions.append(action)
         let item = NSMenuItem(title: title, action: #selector(Action.fire), keyEquivalent: key)
         item.target = action
-        item.keyEquivalentModifierMask = key.isEmpty ? [] : .control
+        item.keyEquivalentModifierMask = key.isEmpty ? [] : Fork.numbersSwapped ? .command : .control // Fork
         item.state = checked ? .on : .off
         return item
     }
@@ -631,11 +631,8 @@ enum SpaceMenu {
         let menu = NSMenu()
         // With profiles in one window, every profile's spaces under its name,
         // ⌃1–⌃9 counting through them all (see OneWindow.swift).
-        let lists: [(name: String?, spaces: [Space])] = browser.merges
-            ? Profiles.shared.list.map { profile in
-                (profile.name, profile.id == browser.profileID ? browser.spaces : Spaces.read(profile: profile.id))
-            }
-            : [(nil, browser.spaces)]
+        // Fork: one list, in the order dragged in the space row.
+        let lists: [(name: String?, spaces: [Space])] = [(nil, browser.everySpace)]
         var index = 0
         for list in lists where !list.spaces.isEmpty {
             if let name = list.name { menu.addItem(.sectionHeader(title: name)) }
@@ -674,7 +671,8 @@ enum SpaceMenu {
         icon.submenu = icons
         menu.addItem(icon)
         // The order is the swipe's, and ⌃1–⌃9's.
-        if let at = browser.spaces.firstIndex(where: { $0.id == here.id }) {
+        // Fork: spaces are moved by dragging them in the row instead.
+        if Fork.upstreamSpaceMoves, let at = browser.spaces.firstIndex(where: { $0.id == here.id }) {
             if at > 0 { menu.addItem(item("Move Left") { browser.moveSpace(here.id, to: at - 1) }) }
             if at < browser.spaces.count - 1 { menu.addItem(item("Move Right") { browser.moveSpace(here.id, to: at + 1) }) }
         }

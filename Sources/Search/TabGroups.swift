@@ -114,21 +114,31 @@ struct GroupHeading: View {
         }
     }
 
+    /// Fork: in the column, a folder: a tab's height, its icon where a tab
+    /// has its site's, its name the size of a tab's title.
+    private var folder: Bool { Fork.folders && !horizontal }
+
     private var long: some View {
         HStack(spacing: 8) {
+            if folder {
+                Image(systemName: group.collapsed ? "folder.fill" : "folder")
+                    .font(.system(size: 13, weight: .medium))
+                    .frame(width: 16, height: 16)
+            }
             if editing {
                 TextField("Group name", text: $draft)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 12.5, weight: .medium))
+                    .font(.system(size: folder ? browser.prefs.sideTitle : 12.5, weight: .medium))
                     .frame(width: horizontal ? max(60, Self.width(for: group.name) - 20) : nil)
                     .focused($focused)
                     .onSubmit(commit)
                     .onExitCommand { browser.editingGroupID = nil }
             } else {
                 Text(group.name)
-                    .font(.system(size: 12.5, weight: .medium))
+                    .font(.system(size: folder ? browser.prefs.sideTitle : 12.5, weight: .medium))
                     .lineLimit(1)
                     .truncationMode(.tail)
+                    .foregroundStyle(folder ? Palette.ink : Palette.muted)
             }
             if !horizontal { Spacer(minLength: 0) }
             if !editing, group.collapsed {
@@ -147,7 +157,7 @@ struct GroupHeading: View {
         }
         .foregroundStyle(Palette.muted)
         .padding(.horizontal, 10)
-        .frame(height: horizontal ? 28 : Self.height)
+        .frame(height: horizontal ? 28 : folder ? browser.prefs.sideRow : Self.height)
         .frame(maxWidth: horizontal ? nil : .infinity, alignment: .leading)
         .fixedSize(horizontal: horizontal, vertical: false)
         .background(RoundedRectangle(cornerRadius: 9, style: .continuous)

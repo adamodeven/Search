@@ -118,6 +118,8 @@ struct KeyCombo: Codable, Hashable {
         if system.contains(combo) || combo.key == "escape" { return true }
         if combo.key == "tab", combo.command || !(combo.control || combo.option) { return true }
         let digit = combo.key.count == 1 && ("1"..."9").contains(combo.key)
+        // Fork: ⌃1–⌃9 are the tabs' here, ⌘1–⌘9 the spaces'.
+        if Fork.numbersSwapped { return digit && !combo.option && !combo.shift && combo.control && !combo.command }
         return digit && !combo.option && !combo.shift && combo.command && !combo.control
     }
 
@@ -265,7 +267,8 @@ struct Command: Identifiable {
         Command("history.clear", "Clear History", .history, nil) { $0.clearHistory() },
     ] + (1...9).map { number in
         Command("spaces.\(number)", "Space \(number)", .spaces,
-                KeyCombo(String(number), command: false, control: true)) { browser in
+                Fork.numbersSwapped ? KeyCombo(String(number)) // Fork: ⌘1–⌘9 for spaces
+                    : KeyCombo(String(number), command: false, control: true)) { browser in
             browser.switchSpace(index: number - 1)
         }
     }

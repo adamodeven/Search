@@ -220,8 +220,9 @@ extension Browser {
     /// Every space this window can go to, in order: its profile's, and with
     /// profiles in one window every profile's, profile by profile.
     var everySpace: [Space] {
-        guard merges else { return spaces }
-        return Profiles.shared.list.flatMap { $0.id == profileID ? spaces : Spaces.read(profile: $0.id) }
+        // Fork: in the order dragged in the space row (SpaceOrder.swift).
+        guard merges else { return SpaceOrder.shared.arrange(spaces) }
+        return SpaceOrder.shared.arrange(Profiles.shared.list.flatMap { $0.id == profileID ? spaces : Spaces.read(profile: $0.id) })
     }
 
     /// With profiles in one window, the profile before this window's (-1) or

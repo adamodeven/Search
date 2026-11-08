@@ -80,8 +80,10 @@ extension Browsers {
             return
         }
         let next = sibling(of: current, in: profile, at: id)
+        let slide = current.spaceID // Fork: slides in, as a swipe does
         bring(next, over: current)
         if next.prefs.usesSpaces { next.enter(id) }
+        if Fork.spacesInRowOrder, current.spaceID == slide { SpaceSlide.arrive(next, from: current, to: id) }
     }
 
     /// Another profile chosen in `current` (its badge, the Profile menu):
@@ -246,6 +248,8 @@ extension Browser {
     /// its own, or past the last the card for a new one — unless another
     /// profile's spaces come next.
     func drawsPage(after at: Int) -> Bool {
-        at < spaces.count && (at + 1 < spaces.count || makingSpace || profileBeyond(1) == nil)
+        // Fork: only when the row's next space is this window's own.
+        if Fork.spacesInRowOrder { return at < spaces.count && (makingSpace || spaceAlong(1).map { $0.profileID == profileID } ?? true) }
+        return at < spaces.count && (at + 1 < spaces.count || makingSpace || profileBeyond(1) == nil)
     }
 }

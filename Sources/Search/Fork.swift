@@ -76,6 +76,13 @@ extension Fork {
     /// round. Changing a space's key in Settings › Shortcuts still works.
     static let numbersSwapped = true
 
+    /// Pinned squares this much taller than upstream's (Side.pinCells).
+    static let squareTaller: CGFloat = 1.3
+
+    /// Swipes between spaces go in the row's order (SpaceOrder.swift),
+    /// across profiles; upstream swipes through a profile's own, in its order.
+    static let spacesInRowOrder = true
+
     /// What, held, shows each tab's number beside it.
     static var tabNumbersHeldWith: NSEvent.ModifierFlags { numbersSwapped ? .control : .command }
 

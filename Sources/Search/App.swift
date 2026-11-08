@@ -1504,6 +1504,9 @@ struct ContentView: View {
             return true
         }
 
+        // Fork: ⌃Z takes back the last thing done to the tabs (TabUndo.swift).
+        if TabUndo.key(event, flags: flags, in: browser) { return true }
+
         // Space keys have no menu; other commands arrive here when rebound.
         // A key taken off a command goes back to the page.
         if ShortcutStore.shared.anyChanged || browser.prefs.usesSpaces, let combo = KeyCombo(event: event) {

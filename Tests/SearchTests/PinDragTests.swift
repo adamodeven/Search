@@ -235,19 +235,21 @@ final class PinDragTests: XCTestCase {
         browser.pin(t[0]); browser.pin(t[1], listed: true)
         browser.select(t[2])
         let window = makeWindow(browser)
+        // Fork: squares are taller (Fork.squareTaller).
+        let grid = (34 * Fork.squareTaller).rounded(.down) + 10
         try await settle()
         // Grid 34 + 10; the pinned row 28 + 2 under it; the line 18 + 2; the rows.
-        let rowsTop = Metrics.strip + 44 + 30 + 20
+        let rowsTop = Metrics.strip + grid + 30 + 20
         try await drag(from: point(x: 70, y: rowsTop + 14 + 30, in: window), through: [
             point(x: 70, y: rowsTop, in: window),
-            point(x: 70, y: Metrics.strip + 44 + 20, in: window),
-            point(x: 70, y: Metrics.strip + 44 + 22, in: window),
+            point(x: 70, y: Metrics.strip + grid + 20, in: window),
+            point(x: 70, y: Metrics.strip + grid + 22, in: window),
         ], in: window)
         XCTAssertNotNil(t[3].pin)
         XCTAssertTrue(t[3].listed, "a pinned row")
         XCTAssertEqual(browser.listedPins.map(\.id), [t[1], t[3]].map(\.id))
         // And that pinned row carried up into the grid: a square, first.
-        try await drag(from: point(x: 70, y: Metrics.strip + 44 + 30 + 14, in: window), through: [
+        try await drag(from: point(x: 70, y: Metrics.strip + grid + 30 + 14, in: window), through: [
             point(x: 40, y: Metrics.strip + 30, in: window),
             point(x: 20, y: Metrics.strip + 17, in: window),
         ], in: window)

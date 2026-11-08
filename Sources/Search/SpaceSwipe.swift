@@ -90,6 +90,7 @@ final class SpaceSwipe {
     /// With profiles in one window, past this window's first space or its
     /// last: the space of the profile that comes before or after.
     private func beyond(_ browser: Browser, _ target: Int) -> UUID? {
+        if Fork.spacesInRowOrder { return browser.forkBeyond(target) } // Fork: the row's order
         if target < 0 { return browser.spaceBeyond(-1) }
         if target >= browser.spaces.count, !browser.makingSpace { return browser.spaceBeyond(1) }
         return nil
@@ -102,7 +103,7 @@ final class SpaceSwipe {
         let width = browser.prefs.sidebar ? browser.prefs.columnWidth : Metrics.strip
         browser.spaceStep = step
         resting = Date().addingTimeInterval(SpaceSwipe.rest)
-        carry(browser, to: CGFloat(-step) * width) {
+        carry(browser, to: CGFloat(-step) * width, quick: Fork.spacesInRowOrder) { // Fork: one quick slide, not two slow ones
             var still = Transaction()
             still.disablesAnimations = true
             withTransaction(still) {
@@ -114,7 +115,7 @@ final class SpaceSwipe {
             next.spaceStep = step
             guard !Motion.reduced else { return }
             withTransaction(still) { next.spaceSwipe = CGFloat(step) * width }
-            withAnimation(.easeOut(duration: 0.22)) { next.spaceSwipe = 0 }
+            withAnimation(.easeOut(duration: Fork.spacesInRowOrder ? 0.16 : 0.22)) { next.spaceSwipe = 0 }
         }
     }
 
@@ -122,9 +123,9 @@ final class SpaceSwipe {
     /// `arrived`. With Reduce Motion on nothing travels: `arrived` at once,
     /// and the space is simply there, as a swipe let go short already
     /// snaps back without moving (Motion.settle).
-    private func carry(_ browser: Browser, to offset: CGFloat, then arrived: @escaping () -> Void) {
+    private func carry(_ browser: Browser, to offset: CGFloat, quick: Bool = false, then arrived: @escaping () -> Void) {
         guard !Motion.reduced else { return arrived() }
-        withAnimation(.easeOut(duration: 0.22), completionCriteria: .removed) {
+        withAnimation(quick ? .easeIn(duration: 0.12) : .easeOut(duration: 0.22), completionCriteria: .removed) {
             browser.spaceSwipe = offset
         } completion: {
             arrived()
@@ -259,7 +260,8 @@ final class SpaceSwipe {
     /// Nothing that way: the rows give a little, and come back.
     private func resisted(_ travel: CGFloat, in browser: Browser) -> CGFloat {
         let here = browser.makingSpace ? browser.spaces.count : (browser.spaces.firstIndex { $0.id == browser.spaceID } ?? 0)
-        let blocked = (travel > 0 && here == 0 && browser.profileBeyond(-1) == nil) || (travel < 0 && here == browser.spaces.count)
+        let first = Fork.spacesInRowOrder ? browser.firstInRow : here == 0 && browser.profileBeyond(-1) == nil // Fork: the row's order
+        let blocked = (travel > 0 && first) || (travel < 0 && here == browser.spaces.count)
         return blocked ? travel / 4 : travel
     }
 

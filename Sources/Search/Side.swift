@@ -140,7 +140,7 @@ struct SideBar: View {
         .frame(maxHeight: .infinity)
         // Rows on their way to or from another space stay in the column.
         .clipped()
-        .onAppear { SpaceSwipe.shared.start(for: browser) }
+        .onAppear { SpaceSwipe.shared.start(for: browser); TabUndo.watch(browser) } // Fork: ⌃Z
         .background {
             ZStack {
                 landing ? greys.hover : onFrame ? Palette.frame : Palette.ground
@@ -215,7 +215,7 @@ struct SideBar: View {
                 .offset(x: swipe)
             // Only while the fingers are bringing one in: the one they are
             // bringing, a page's width away.
-            if swipe > 0, at > 0 {
+            if swipe > 0, Fork.spacesInRowOrder ? browser.drawsPage(before: at) : at > 0 { // Fork: the row's order
                 page(at - 1, pill: before)
                     .offset(x: swipe - width)
             }
@@ -536,7 +536,7 @@ struct SideBar: View {
         // (upstream keeps three places in a single row of fewer).
         let slots = rows
         let widths = slots.map { max(20, (room - CGFloat($0 - 1) * gap) / CGFloat($0)) }
-        let height = min(SideBar.square, widths.min() ?? SideBar.square)
+        let height = min(SideBar.square, widths.min() ?? SideBar.square) * Fork.squareTaller // Fork: taller squares
         var cells: [CGRect] = []
         for (row, n) in rows.enumerated() {
             for col in 0..<n {
@@ -662,6 +662,7 @@ struct SideBar: View {
                                 activeID: browser.activeID, interactive: true, pill: pill,
                                 close: { browser.closeTab(tab) })
                         .modifier(TrailIndent(place: trail[tab.id], tab: tab.id)) // Fork: tab trails
+                        .modifier(RowSpot(browser: browser, tab: tab)) // Fork: tabs carried into a space
                         // Positions here are among the loose rows; the pinned block
                         // sits in front of them in the real list.
                         .modifier(Carried(index: index, steps: looseSteps, vertical: true,
@@ -709,6 +710,7 @@ struct SideBar: View {
                         activeID: browser.activeID, interactive: true, pill: pill,
                         close: { browser.closeTab(tab) })
                     .padding(.leading, icons ? 0 : 14)
+                    .modifier(RowSpot(browser: browser, tab: tab)) // Fork: tabs carried into a space
                     .modifier(Carried(index: index, steps: memberSteps, vertical: true,
                                       space: "rows", onDropTab: { source, point in drop(source, at: point) },
                                       groupDestination: { source, point in destination(source, at: point) },
@@ -858,7 +860,8 @@ struct SideBar: View {
     /// The foot's door and its margin beneath; with icons only, its doors
     /// one above the other.
     private var footHeight: CGFloat {
-        icons ? CGFloat(SideFoot.doors(prefs, browser.fetches, hanging: browser.downloadsHanging)) * 28 + 8 : 26 + 10
+        icons ? CGFloat(SideFoot.doors(prefs, browser.fetches, hanging: browser.downloadsHanging)) * 28 + 8
+            : 26 + 10 + (SpaceRow.shows(browser) ? SpaceRow.height : 0) // Fork: the rows stop above the space row
     }
 
     @ViewBuilder

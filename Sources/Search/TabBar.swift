@@ -1029,7 +1029,7 @@ struct Carried: ViewModifier {
                             CarryGuard.open(ticket, end: callOff)
                         }
                         travel = vertical ? value.translation.height : value.translation.width
-                        if let browser { SpaceDrops.shared.track(browser) } // Fork: tabs to a space's icon
+                        if let browser { SpaceDrops.shared.track(browser, carrying: tab) } // Fork: held over a space's icon, into that space
                         // Asked every move, so the block it left lets go
                         // of it as soon as it is elsewhere.
                         let crossed = cross?(value.location) == true
@@ -1053,7 +1053,7 @@ struct Carried: ViewModifier {
                         // came after can't be where it was let go.
                         guard CarryGuard.close(ticket) else { return }
                         // Fork: let go over a space's icon, it goes there (TabsToSpace.swift).
-                        if let browser, let tab, SpaceDrops.shared.take(tab, in: browser) {
+                        if let browser, let tab, SpaceCarry.shared.active || SpaceDrops.shared.take(tab, in: browser) {
                             if browser.prefs.splitView { _ = TabDrag.shared.finish(browser: browser, tab: tab) }
                             _ = land?(nil)
                             if reordered { move(from) }
@@ -1091,6 +1091,8 @@ struct Carried: ViewModifier {
                             if let onDropTab, let tab { onDropTab(tab, value.location) }
                             else { onDrop?(value.location) }
                         }
+                        // Fork: the other picked tabs come along (TabsToSpace.swift).
+                        if let browser, let tab { withAnimation(Motion.settle) { browser.follow(tab) } }
                         withAnimation(Motion.settle) {
                             held = false
                             travel = 0
@@ -1377,41 +1379,37 @@ struct TabMenu: View {
     let close: () -> Void
 
     var body: some View {
-        singleMenu
-        if browser.selectedTabIDs.contains(tab.id) && browser.visibleSelectedTabCount > 1 {
-            Divider()
-            Button("Copy Addresses") { browser.copySelectedTabLinks() }
-                .disabled(browser.selectedTabLinkCount == 0)
-        }
+        singleMenu // Fork: the copies in it are every picked tab's (ManyTabs.swift)
     }
 
     @ViewBuilder
     private var singleMenu: some View {
-        if browser.prefs.usesTabGroups && tab.pin == nil && !tab.shy && !tab.bench {
-            Menu("Move to Group") {
-                Button("New Group") { browser.addTabGroup(containing: tab) }
+        // Fork: every picked tab, pins too (ManyTabs.swift).
+        if browser.prefs.usesTabGroups && browser.groupable(tab) {
+            Menu(browser.manyCount(tab) > 1 ? "Move \(browser.manyCount(tab)) Tabs to Group" : "Move to Group") {
+                Button("New Group") { browser.group(tab, into: nil, new: true) }
                 if !browser.tabGroups.isEmpty { Divider() }
                 ForEach(browser.tabGroups) { group in
-                    Button(group.name) { browser.move(tab, toGroup: group.id) }
-                        .disabled(tab.groupID == group.id)
+                    Button(group.name) { browser.group(tab, into: group.id) }
+                        .disabled(browser.many(tab).allSatisfy { $0.groupID == group.id })
                 }
-                if tab.groupID != nil {
+                if browser.many(tab).contains(where: { $0.groupID != nil }) {
                     Divider()
-                    Button("Remove from Group") { browser.move(tab, toGroup: nil) }
+                    Button("Remove from Group") { browser.group(tab, into: nil) }
                 }
             }
         }
         let rows = browser.prefs.showsPinRows
         if tab.pin == nil {
-            Button("Pin") { browser.pin(tab) }
+            Button(browser.manyLabel("Pin", tab)) { browser.pinMany(tab) } // Fork: every picked tab
                 .disabled(!tab.isWeb || tab.shy)
             if rows {
-                Button("Pin as Row") { browser.pin(tab, listed: true) }
+                Button("Pin as Row") { browser.pinMany(tab, listed: true) }
                     .disabled(!tab.isWeb || tab.shy)
             }
         } else {
             if rows {
-                Button(tab.listed ? "Show as Square" : "Show as Row") { browser.setListed(tab, !tab.listed) }
+                Button(tab.listed ? "Show as Square" : "Show as Row") { browser.listMany(tab, !tab.listed) }
             }
             // A row wears its title, not its letter; and a click on it is
             // the address, so the way home a square's double-click is
@@ -1424,16 +1422,13 @@ struct TabMenu: View {
             }
             if browser.prefs.showsSharedPins {
                 Button(tab.everywhere ? "Only in This Space" : "Keep in Every Space") {
-                    if tab.everywhere { browser.keepHere(tab) } else { browser.shareEverywhere(tab) }
+                    browser.everywhereMany(tab, !tab.everywhere)
                 }
             }
-            Button("Unpin") { browser.unpin(tab) }
+            Button(browser.manyLabel("Unpin", tab)) { browser.unpinMany(tab) }
             // Away for good in one go, where Unpin, finding the row and its
             // × took three (#834); ⇧⌘T brings it back as a tab.
-            Button("Delete") {
-                browser.unpin(tab)
-                browser.close(tab)
-            }
+            Button(browser.manyLabel("Delete", tab)) { browser.deleteMany(tab) }
         }
         // A shared pin is in every space already: nowhere to move it.
         if browser.prefs.usesSpaces, !tab.bench, !tab.everywhere,
@@ -1486,25 +1481,22 @@ struct TabMenu: View {
             // Another window, or a new one (see Browser.moveToWindow).
             let others = Browsers.all.filter { $0 !== browser && $0.isOpen && !$0.isPopup && $0.profileID == browser.profileID }
             if others.isEmpty {
-                Button("Move to New Window") { browser.moveToWindow(tab, nil) }
+                Button("Move to New Window") { browser.moveManyToWindow(tab, nil) }
                     .disabled(browser.tabs.count < 2)
             } else {
                 Menu("Move to Window") {
-                    Button("New Window") { browser.moveToWindow(tab, nil) }
+                    Button("New Window") { browser.moveManyToWindow(tab, nil) }
                         .disabled(browser.tabs.count < 2)
                     Divider()
                     ForEach(Array(others.enumerated()), id: \.offset) { _, other in
-                        Button(other.windowName) { browser.moveToWindow(tab, other) }
+                        Button(other.windowName) { browser.moveManyToWindow(tab, other) }
                     }
                 }
             }
         }
         Divider()
         Button("Rename") { browser.beginTabRename(tab) }
-        Button("Duplicate") {
-            browser.select(tab)
-            browser.duplicate()
-        }
+        Button(browser.manyLabel("Duplicate", tab)) { browser.duplicateMany(tab) }
         .disabled(!tab.isWeb)
         // The card a click on the tab you are on shows under its address.
         Button("Site Information…") {
@@ -1512,35 +1504,22 @@ struct TabMenu: View {
             browser.beginTabEdit(tab)
         }
         .disabled(tab.isBlank || tab.address == nil || tab.pin != nil)
-        Button("Copy Address") {
-            browser.select(tab)
-            browser.copyAddress()
-        }
+        Button(browser.manyCount(tab) > 1 ? "Copy Addresses" : "Copy Address") { browser.copyMany(tab, as: .address) }
         .disabled(!tab.isWeb)
-        Button("Copy as Markdown Link") {
-            browser.select(tab)
-            browser.copyMarkdownLink()
-        }
+        Button(browser.manyCount(tab) > 1 ? "Copy as Markdown Links" : "Copy as Markdown Link") { browser.copyMany(tab, as: .markdown) }
         .disabled(!tab.isWeb)
-        Button("Copy Clean Link") {
-            browser.select(tab)
-            browser.copyCleanLink()
-        }
+        Button(browser.manyCount(tab) > 1 ? "Copy Clean Links" : "Copy Clean Link") { browser.copyMany(tab, as: .clean) }
         .disabled(!tab.isWeb)
         if browser.prefs.sitesInPanel {
             Button("Open in Side Panel") { browser.openInSidePanel(tab) }
                 .disabled(!tab.isWeb || tab.shy)
         }
-        Button(tab.muted ? "Unmute Tab" : "Mute Tab") { tab.toggleMute() }
+        Button(browser.manyCount(tab) > 1 ? (tab.muted ? "Unmute Tabs" : "Mute Tabs") : (tab.muted ? "Unmute Tab" : "Mute Tab")) { browser.muteMany(tab) }
         // Its page let go of now, as it would be after half an hour unseen:
         // the row keeps its title and picture, and it loads again when gone
         // to. Not the tab on screen, nor one that has to stay awake (#310).
-        Button("Put to Sleep") {
-            browser.sleep(tab) { outcome in
-                if outcome != "asleep" { browser.announce("Stays awake: \(outcome)") }
-            }
-        }
-        .disabled(browser.awake(because: tab) != nil)
+        Button("Put to Sleep") { browser.sleepMany(tab) }
+            .disabled(browser.many(tab).allSatisfy { browser.awake(because: $0) != nil })
         Divider()
         // Right-clicked among tabs picked in the column: all of them, as ⌘W
         // closes them.
@@ -1550,7 +1529,7 @@ struct TabMenu: View {
         } else {
             Button("Close Tab", action: close)
         }
-        Button("Close Other Tabs") { browser.closeOthers(but: tab) }
+        Button("Close Other Tabs") { browser.closeOthersMany(tab) }
             .disabled(browser.tabs.count < 2)
         Button(browser.prefs.sidebar ? "Close Tabs Below" : "Close Tabs to the Right") { browser.closeTabsBelow(tab) }
             .disabled(browser.tabsBelow(tab).isEmpty)

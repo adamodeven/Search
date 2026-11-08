@@ -31,6 +31,7 @@ final class SpaceOrder: ObservableObject {
         order = (store.stringArray(forKey: Self.orderKey) ?? []).compactMap(UUID.init)
         emoji = Dictionary(uniqueKeysWithValues: ((store.dictionary(forKey: Self.emojiKey) as? [String: String]) ?? [:])
             .compactMap { key, value in UUID(uuidString: key).map { ($0, value) } })
+        DispatchQueue.main.async { SpaceOrder.shared.commit() }
     }
 
     /// Upstream's list, in this fork's order.
@@ -59,6 +60,18 @@ final class SpaceOrder: ObservableObject {
         ids.insert(moving, at: to)
         order = ids + order.filter { !ids.contains($0) }
         store.set(order.map(\.uuidString), forKey: Self.orderKey)
+    }
+
+    /// Every profile's own list of spaces put in this order too, on disk,
+    /// so a swipe and each window's list go the way the row does. Once a
+    /// drag in the row is let go, and once at launch.
+    func commit() {
+        guard !order.isEmpty, !Store.testing else { return }
+        let all = Spaces.read()
+        let arranged = arrange(all)
+        guard arranged.map(\.id) != all.map(\.id) else { return }
+        store.set(true, forKey: "spaces.orderKept")
+        Spaces.write(arranged)
     }
 
     func setEmoji(_ value: String?, for id: UUID) {
@@ -108,5 +121,54 @@ extension SpaceOrder {
                 }
             }
         }
+    }
+}
+
+extension Browser {
+    /// The space `step` along from the one on screen, in the row's order,
+    /// whichever profile it is in; nil past either end.
+    func spaceAlong(_ step: Int) -> Space? {
+        let list = everySpace
+        guard let at = list.firstIndex(where: { $0.id == spaceID }), list.indices.contains(at + step) else { return nil }
+        return list[at + step]
+    }
+
+    /// A swipe's way past `target` (an index among this window's spaces):
+    /// another profile's space, when that is what comes next in the row.
+    func forkBeyond(_ target: Int) -> UUID? {
+        guard !makingSpace, let here = spaces.firstIndex(where: { $0.id == spaceID }), target != here,
+              let next = spaceAlong(target > here ? 1 : -1), next.profileID != profileID else { return nil }
+        return next.id
+    }
+
+    /// Whether the page before is drawn beside during a swipe: a space of
+    /// this window's own that comes before in the row.
+    func drawsPage(before at: Int) -> Bool {
+        guard at > 0 else { return false }
+        if makingSpace { return true }
+        return spaceAlong(-1).map { $0.profileID == profileID } ?? false
+    }
+
+    /// Nothing before this space in the row: a swipe back gives and returns.
+    var firstInRow: Bool { !makingSpace && spaceAlong(-1) == nil }
+}
+
+@MainActor
+enum SpaceSlide {
+    /// A space of another profile clicked to: that profile's window, just
+    /// put in this one's place, brings its rows in from the side the row
+    /// says, as a swipe does.
+    static func arrive(_ next: Browser, from current: Browser, to id: UUID) {
+        guard !Motion.reduced, next !== current else { return }
+        let list = current.everySpace
+        guard let a = list.firstIndex(where: { $0.id == current.spaceID }),
+              let b = list.firstIndex(where: { $0.id == id }), a != b else { return }
+        let step = b > a ? 1 : -1
+        let width = next.prefs.sidebar ? next.prefs.columnWidth : Metrics.strip
+        next.spaceStep = step
+        var still = Transaction()
+        still.disablesAnimations = true
+        withTransaction(still) { next.spaceSwipe = CGFloat(step) * width }
+        withAnimation(.easeOut(duration: 0.2)) { next.spaceSwipe = 0 }
     }
 }

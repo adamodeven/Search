@@ -218,7 +218,9 @@ private struct GroupHeadingShared: ViewModifier {
                 }
                 return true
             }
-            .onDrag { NSItemProvider(object: "search-group:\(group.id.uuidString)" as NSString) }
+            // Fork: carried by hand in the column instead (FolderDrag.swift).
+            .upstreamGroupDrag(unless: Fork.folders && dragSpace == "rows") { NSItemProvider(object: "search-group:\(group.id.uuidString)" as NSString) }
+            .modifier(FolderDragIn(browser: browser, group: group, on: Fork.folders && dragSpace == "rows"))
             .contextMenu {
                 Button("Rename Group") { browser.editingGroupID = group.id }
                 Button(group.collapsed ? "Expand Group" : "Collapse Group") { browser.toggleTabGroup(group.id) }

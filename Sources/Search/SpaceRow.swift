@@ -26,6 +26,8 @@ struct SpaceRow: View {
     /// As small as the icons go before the row scrolls instead.
     static let least: CGFloat = 16
     static let gap: CGFloat = 2
+    /// All it takes up at the column's foot, its margin beneath included.
+    static let height: CGFloat = dot + 4
 
     /// Each icon's size for this many spaces in a column this wide: full
     /// size while they fit, smaller down to `least` after.
@@ -107,6 +109,7 @@ private struct SpaceDrop: DropDelegate {
 
     func performDrop(info: DropInfo) -> Bool {
         dragging = nil
+        SpaceOrder.shared.commit()
         return true
     }
 }
@@ -173,7 +176,7 @@ private struct SpaceRowDot: View {
             Button("Space Options…") { SpaceMenu.show(for: browser) }
         }
         Button("Choose Emoji…") {
-            Ask.name("Emoji for “\(space.name)”", detail: "Press ⌃⌘Space for the emoji picker.",
+            Ask.name("Emoji for “\(space.name)”", detail: "Press fn (🌐) for the emoji picker.",
                      placeholder: "😀", initial: emoji ?? "", confirm: "Use") {
                 SpaceOrder.shared.setEmoji($0, for: space.id)
             }

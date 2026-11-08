@@ -1,10 +1,10 @@
 import AppKit
 import Combine
 
-// Fork: ⌃Z takes back the last thing done to the tabs, as in Arc. A tab
+// Fork: ⌘Z takes back the last thing done to the tabs, as in Arc. A tab
 // moved, pinned or unpinned, put in a group or taken out, a group made;
 // tabs closed (they come back, as ⇧⌘T brings them); tabs moved to another
-// space (they come back here). Each ⌃Z one step further back.
+// space (they come back here). Each ⌘Z one step further back.
 //
 // The window's row is watched rather than every way of changing it hooked:
 // whenever the window changes, the row is looked at once the change is done,
@@ -18,7 +18,10 @@ final class TabUndo {
 
     private weak var browser: Browser?
     private var last: Arrangement
-    private var ghosts: Int
+    /// The closes already seen, by id: not how many, as the list keeps
+    /// only the last dozen — once full, a close took one off as it put one
+    /// on, and no close was ever a step.
+    private var known: Set<UUID>
     private var steps: [Step] = []
     private var scheduled = false
     private var quiet = 0
@@ -39,7 +42,7 @@ final class TabUndo {
     private init(_ browser: Browser) {
         self.browser = browser
         last = Arrangement(browser)
-        ghosts = browser.ghosts.count
+        known = Set(browser.ghosts.map(\.id))
         bag = browser.objectWillChange.sink { [weak self] _ in self?.soon() }
     }
 
@@ -61,13 +64,12 @@ final class TabUndo {
         undo.look()
         undo.quiet += 1
         let before = undo.last
-        let closed = browser.ghosts.count
         change()
         undo.quiet -= 1
         let now = Arrangement(browser)
-        undo.ghosts = browser.ghosts.count
-        if browser.ghosts.count > closed {
-            undo.push(.reopen(undo.units(since: closed)))
+        let closes = undo.fresh()
+        if closes > 0 {
+            undo.push(.reopen(closes))
             // What else it did (a pin put down before it closed) is the reopening's.
         } else if now.space == before.space, now.ids == before.ids, now != before {
             undo.push(.arrangement(before))
@@ -81,11 +83,13 @@ final class TabUndo {
         undo.push(.spaced(ids, from: from, to: to))
     }
 
-    /// ⌃Z, from the window's keys. False for anything else, or while a
-    /// field of the window's own is being typed in.
+    /// ⌘Z, from the window's keys, as in Arc. False for anything else, and
+    /// while a field of the window's own is being typed in: Edit › Undo's
+    /// then. (The window's keys leave it to the page too while the caret is
+    /// in a box on it — App.swift, caretIn.)
     static func key(_ event: NSEvent, flags: NSEvent.ModifierFlags, in browser: Browser) -> Bool {
-        guard flags.intersection([.command, .option, .control, .shift]) == [.control],
-              event.charactersIgnoringModifiers?.lowercased() == "z" || event.keyCode == 6 else { return false }
+        guard flags.intersection([.command, .option, .control, .shift]) == [.command],
+              event.keyCode == 6 else { return false }
         if let editor = browser.window?.firstResponder as? NSTextView, editor.isEditable { return false }
         guard let undo = of(browser) else { return false }
         undo.undo()
@@ -93,6 +97,12 @@ final class TabUndo {
     }
 
     // MARK: - watching
+
+    /// A tab or pin still in hand: the button down, or a carry not yet put
+    /// down (CarryGuard), whichever the hand's events tell first.
+    private static var carrying: Bool {
+        NSEvent.pressedMouseButtons & 1 != 0 || CarryGuard.count > 0
+    }
 
     private func soon() {
         guard !scheduled else { return }
@@ -106,10 +116,9 @@ final class TabUndo {
     private func look() {
         guard quiet == 0, let browser else { return }
         let now = Arrangement(browser)
-        let closed = browser.ghosts.count
-        defer { ghosts = closed }
-        if closed > ghosts {
-            push(.reopen(units(since: ghosts)))
+        let closes = fresh()
+        if closes > 0 {
+            push(.reopen(closes))
             last = now
             base = nil
             return
@@ -120,7 +129,7 @@ final class TabUndo {
             return
         }
         guard now != last else { return settle() }
-        if NSEvent.pressedMouseButtons & 1 != 0 {
+        if TabUndo.carrying {
             // Still being carried: the step is from where it started.
             if base == nil { base = last }
             last = now
@@ -135,7 +144,7 @@ final class TabUndo {
     /// A drag let go with nothing more changing after it.
     private func settle() {
         guard let base else { return }
-        if NSEvent.pressedMouseButtons & 1 != 0 {
+        if TabUndo.carrying {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in self?.look() }
             return
         }
@@ -143,13 +152,14 @@ final class TabUndo {
         if base != last, base.space == last.space, base.ids == last.ids { push(.arrangement(base)) }
     }
 
-    /// The closes among the ghosts after the first `count`: one for each
-    /// tab closed alone, one for each bulk close.
-    private func units(since count: Int) -> Int {
+    /// The closes since last looked, now seen: one for each tab closed
+    /// alone, one for each bulk close.
+    private func fresh() -> Int {
         guard let browser else { return 0 }
-        let fresh = browser.ghosts.dropFirst(count)
+        let new = browser.ghosts.filter { !known.contains($0.id) }
+        known = Set(browser.ghosts.map(\.id))
         var batches = Set<UUID>()
-        return fresh.filter { ghost in ghost.batch.map { batches.insert($0).inserted } ?? true }.count
+        return new.filter { ghost in ghost.batch.map { batches.insert($0).inserted } ?? true }.count
     }
 
     private func push(_ step: Step) {
@@ -170,7 +180,7 @@ final class TabUndo {
         defer {
             quiet -= 1
             last = Arrangement(browser)
-            ghosts = browser.ghosts.count
+            known = Set(browser.ghosts.map(\.id))
             base = nil
         }
         switch step {
@@ -195,7 +205,7 @@ final class TabUndo {
     }
 }
 
-/// The row as far as ⌃Z cares: which tabs, in what order, pinned how and
+/// The row as far as ⌘Z cares: which tabs, in what order, pinned how and
 /// in which group, and the groups' names.
 @MainActor
 private struct Arrangement: Equatable {

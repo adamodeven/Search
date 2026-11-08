@@ -89,22 +89,21 @@ extension Browser {
 final class SpaceDrops: ObservableObject {
     static let shared = SpaceDrops()
 
-    private struct Spot {
-        weak var window: NSWindow?
-        var rect: CGRect
-    }
-
-    /// By space, in the window's own coordinates (SwiftUI's global: from
-    /// the top left of the window's content).
-    private var spots: [UUID: Spot] = [:]
+    /// By window and space, in the window's own coordinates (SwiftUI's
+    /// global: from the top left of the window's content). By window too:
+    /// with profiles in one window, each profile's window draws the same
+    /// row, and kept by space alone the one drawn last — tucked away, off
+    /// screen — had every icon, and the window in front none.
+    private var spots: [ObjectIdentifier: [UUID: CGRect]] = [:]
     /// The icon a tab is being carried over now.
     @Published private(set) var over: UUID?
     /// Held over an icon this long, the column turns to its space.
     private static let dwell: TimeInterval = 0.3
     private var waiting: DispatchWorkItem?
 
-    func place(_ space: UUID, at rect: CGRect, in window: NSWindow?) {
-        spots[space] = Spot(window: window, rect: rect)
+
+    func place(_ space: UUID, at rect: CGRect, for browser: Browser) {
+        spots[ObjectIdentifier(browser), default: [:]][space] = rect
     }
 
     /// The space of this window's profile whose icon is under the pointer.
@@ -112,8 +111,8 @@ final class SpaceDrops: ObservableObject {
         guard let window = browser.window, let content = window.contentView else { return nil }
         let inWindow = window.convertPoint(fromScreen: point)
         let flipped = CGPoint(x: inWindow.x, y: content.bounds.height - inWindow.y)
-        return spots.first { id, spot in
-            spot.window === window && spot.rect.insetBy(dx: -2, dy: -4).contains(flipped)
+        return spots[ObjectIdentifier(browser)]?.first { id, rect in
+            rect.insetBy(dx: -2, dy: -4).contains(flipped)
                 && id != browser.spaceID && browser.spaces.contains { $0.id == id }
         }?.key
     }
@@ -166,10 +165,10 @@ final class SpaceDrops: ObservableObject {
 /// to find where they are let go.
 @MainActor
 enum RowSpots {
-    fileprivate static var spots: [UUID: (window: NSWindow?, rect: CGRect)] = [:]
+    fileprivate static var spots: [UUID: (browser: ObjectIdentifier, rect: CGRect)] = [:]
 
-    static func place(_ tab: UUID, at rect: CGRect, in window: NSWindow?) {
-        spots[tab] = (window, rect)
+    static func place(_ tab: UUID, at rect: CGRect, for browser: Browser) {
+        spots[tab] = (ObjectIdentifier(browser), rect)
     }
 }
 
@@ -179,7 +178,7 @@ struct RowSpot: ViewModifier {
 
     func body(content: Content) -> some View {
         content.onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { rect in
-            RowSpots.place(tab.id, at: rect, in: browser.window)
+            RowSpots.place(tab.id, at: rect, for: browser)
         }
     }
 }
@@ -254,7 +253,7 @@ final class SpaceCarry {
         let ids = Set(here.map(\.id))
         let rows = browser.tabs.filter { !ids.contains($0.id) && ($0.pin == nil || $0.listed) }
         guard let (row, rect) = rows.compactMap({ tab -> (Tab, CGRect)? in
-            guard let spot = RowSpots.spots[tab.id], spot.window === window else { return nil }
+            guard let spot = RowSpots.spots[tab.id], spot.browser == ObjectIdentifier(browser) else { return nil }
             return (tab, spot.rect)
         }).first(where: { _, rect in
             rect.insetBy(dx: -20, dy: 0).contains(point)
@@ -327,5 +326,31 @@ private struct CarryLabel: View {
         .padding(.vertical, 6)
         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(.regularMaterial))
         .fixedSize()
+    }
+}
+
+extension Browser {
+    /// Pressed on one of several picked tabs: nothing changes yet, so a
+    /// drag starting from here carries them all. Making it the tab on
+    /// screen would have dropped the pick (activeID's didSet clears it).
+    /// Let go where it went down — a click — and it is that tab alone, as
+    /// a click on a tab always was. False for any other press.
+    func pressPicked(_ tab: Tab) -> Bool {
+        guard selectedTabIDs.contains(tab.id), visibleSelectedTabCount > 1 else { return false }
+        let start = NSEvent.mouseLocation
+        var monitor: Any?
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseUp) { [weak self] event in
+            if let monitor { NSEvent.removeMonitor(monitor) }
+            monitor = nil
+            let end = NSEvent.mouseLocation
+            if hypot(end.x - start.x, end.y - start.y) < 5 {
+                DispatchQueue.main.async {
+                    self?.clearTabSelection()
+                    self?.select(tab)
+                }
+            }
+            return event
+        }
+        return true
     }
 }

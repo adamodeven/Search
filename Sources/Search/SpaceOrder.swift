@@ -165,10 +165,22 @@ enum SpaceSlide {
               let b = list.firstIndex(where: { $0.id == id }), a != b else { return }
         let step = b > a ? 1 : -1
         let width = next.prefs.sidebar ? next.prefs.columnWidth : Metrics.strip
+        slideIn(next, step: step, from: CGFloat(step) * width)
+    }
+
+    /// `next`'s rows, just put on screen, brought in from `start` — off to
+    /// the side the row says, or where the fingers left the last ones — in
+    /// one quick slide. The way back to 0 waits for the next frame: set in
+    /// the same pass as the start, SwiftUI only ever saw the 0, and nothing
+    /// moved.
+    static func slideIn(_ next: Browser, step: Int, from start: CGFloat) {
         next.spaceStep = step
+        guard !Motion.reduced else { return }
         var still = Transaction()
         still.disablesAnimations = true
-        withTransaction(still) { next.spaceSwipe = CGFloat(step) * width }
-        withAnimation(.easeOut(duration: 0.2)) { next.spaceSwipe = 0 }
+        withTransaction(still) { next.spaceSwipe = start }
+        DispatchQueue.main.async {
+            withAnimation(.easeOut(duration: 0.22)) { next.spaceSwipe = 0 }
+        }
     }
 }

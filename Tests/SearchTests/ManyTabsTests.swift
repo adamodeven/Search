@@ -3,7 +3,7 @@ import XCTest
 @testable import Search
 
 /// Fork: a tab's menu and a drag act on every picked tab (ManyTabs.swift,
-/// TabsToSpace.swift), and ⌃Z takes back what was done (TabUndo.swift).
+/// TabsToSpace.swift), and ⌘Z takes back what was done (TabUndo.swift).
 @MainActor
 final class ManyTabsTests: XCTestCase {
     override class func setUp() {
@@ -101,13 +101,37 @@ final class ManyTabsTests: XCTestCase {
         XCTAssertEqual(names(browser), ["two", "three", "four", "one"])
         TabUndo.step(browser) { browser.pin(browser.tabs[1]) }
         XCTAssertEqual(browser.tabs[0].label, "three")
-        let key = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .control, timestamp: 0,
+        let key = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0,
                                    windowNumber: 0, context: nil, characters: "\u{1a}",
                                    charactersIgnoringModifiers: "z", isARepeat: false, keyCode: 6)!
-        XCTAssertTrue(TabUndo.key(key, flags: .control, in: browser))
+        XCTAssertTrue(TabUndo.key(key, flags: .command, in: browser))
         XCTAssertNil(browser.tabs.first { $0.label == "three" }?.pin)
-        XCTAssertTrue(TabUndo.key(key, flags: .control, in: browser))
+        XCTAssertTrue(TabUndo.key(key, flags: .command, in: browser))
         XCTAssertEqual(names(browser), ["one", "two", "three", "four"])
+    }
+
+    /// The closed list keeps a dozen: once full, a close still counts.
+    func testUndoReopensACloseWithTheClosedListFull() {
+        let browser = makeBrowser()
+        for index in 0..<14 {
+            browser.newTab()
+            browser.tabs.last?.restore(url: URL(string: "https://filler\(index).example/")!, title: "filler")
+            browser.close(browser.tabs.last!)
+        }
+        TabUndo.watch(browser)
+        let two = browser.tabs[1]
+        browser.close(two)
+        XCTAssertEqual(names(browser), ["one", "three", "four"])
+        let key = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0,
+                                   windowNumber: 0, context: nil, characters: "\u{1a}",
+                                   charactersIgnoringModifiers: "z", isARepeat: false, keyCode: 6)!
+        let undone = expectation(description: "the close is seen")
+        DispatchQueue.main.async {
+            XCTAssertTrue(TabUndo.key(key, flags: .command, in: browser))
+            XCTAssertEqual(browser.tabs.compactMap { $0.address?.host }, ["one.example", "two.example", "three.example", "four.example"])
+            undone.fulfill()
+        }
+        wait(for: [undone], timeout: 2)
     }
 }
 

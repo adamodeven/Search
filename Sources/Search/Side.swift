@@ -42,6 +42,7 @@ struct SideBar: View {
     /// the rows add up to, which are kept where changing them draws nothing.
     @State private var fits = true
     @State private var room = Room()
+    @State private var footTall: CGFloat = 0 // Fork: the foot as drawn (SpaceRow.swift)
     private final class Room {
         var height: CGFloat = .infinity
         var needed: CGFloat = 0
@@ -132,7 +133,7 @@ struct SideBar: View {
 
             VStack {
                 Spacer()
-                foot
+                foot.modifier(FootTall(tall: $footTall)) // Fork
             }
         }
         .environment(\.greys, greys)
@@ -861,7 +862,7 @@ struct SideBar: View {
     /// one above the other.
     private var footHeight: CGFloat {
         icons ? CGFloat(SideFoot.doors(prefs, browser.fetches, hanging: browser.downloadsHanging)) * 28 + 8
-            : 26 + 10 + (SpaceRow.shows(browser) ? SpaceRow.height : 0) // Fork: the rows stop above the space row
+            : footTall > 0 ? footTall + 6 : 26 + 10 // Fork: the rows stop clear of the foot as drawn, its space row too
     }
 
     @ViewBuilder
@@ -1045,6 +1046,7 @@ private struct PinSquare: View {
         .animation(Motion.quick, value: browser.peekFrom)
         .contentShape(RoundedRectangle(cornerRadius: scale * 9 / 34, style: .continuous))
         .modifier(TabPress(enabled: browser.editingPin != tab.id, active: live, selected: $selectedOnPress) {
+            if browser.pressPicked(tab) { return } // Fork: the pick stays for a drag (TabsToSpace.swift)
             browser.clearTabSelection()
             browser.select(tab)
         })
@@ -1143,6 +1145,7 @@ private struct SideRow: View {
             .frame(height: prefs.sideRow)
             .contentShape(Rectangle())
             .modifier(TabPress(enabled: interactive && !editing, active: live, selected: $selectedOnPress, pressing: $pressed) {
+                if browser.pressPicked(tab) { return } // Fork: the pick stays for a drag (TabsToSpace.swift)
                 browser.clearTabSelection()
                 browser.select(tab)
             })

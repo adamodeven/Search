@@ -1504,8 +1504,10 @@ struct ContentView: View {
             return true
         }
 
-        // Fork: ⌃Z takes back the last thing done to the tabs (TabUndo.swift).
-        if TabUndo.key(event, flags: flags, in: browser) { return true }
+        // Fork: ⌘Z takes back the last thing done to the tabs (TabUndo.swift).
+        // The page keeps it while there is typing on it to take back.
+        if !browser.veiling, !(caretIn(event) && browser.active?.built?.undoManager?.canUndo == true),
+           TabUndo.key(event, flags: flags, in: browser) { return true }
 
         // Space keys have no menu; other commands arrive here when rebound.
         // A key taken off a command goes back to the page.

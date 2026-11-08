@@ -103,7 +103,22 @@ final class SpaceSwipe {
         let width = browser.prefs.sidebar ? browser.prefs.columnWidth : Metrics.strip
         browser.spaceStep = step
         resting = Date().addingTimeInterval(SpaceSwipe.rest)
-        carry(browser, to: CGFloat(-step) * width, quick: Fork.spacesInRowOrder) { // Fork: one quick slide, not two slow ones
+        // Fork: the other profile's window at once, its rows sliding in from
+        // where the fingers left these: one slide, as within a profile, not
+        // one out, a wait, and one in (SpaceOrder.swift).
+        if Fork.spacesInRowOrder {
+            let start = CGFloat(step) * width + browser.spaceSwipe
+            var still = Transaction()
+            still.disablesAnimations = true
+            withTransaction(still) {
+                browser.switchSpace(to: space)
+                browser.spaceSwipe = 0
+            }
+            guard let next = Browsers.front, next !== browser, next.spaceID == space else { return }
+            self.browser = next
+            return SpaceSlide.slideIn(next, step: step, from: start)
+        }
+        carry(browser, to: CGFloat(-step) * width) {
             var still = Transaction()
             still.disablesAnimations = true
             withTransaction(still) {
@@ -115,7 +130,7 @@ final class SpaceSwipe {
             next.spaceStep = step
             guard !Motion.reduced else { return }
             withTransaction(still) { next.spaceSwipe = CGFloat(step) * width }
-            withAnimation(.easeOut(duration: Fork.spacesInRowOrder ? 0.16 : 0.22)) { next.spaceSwipe = 0 }
+            withAnimation(.easeOut(duration: 0.22)) { next.spaceSwipe = 0 }
         }
     }
 
@@ -123,9 +138,9 @@ final class SpaceSwipe {
     /// `arrived`. With Reduce Motion on nothing travels: `arrived` at once,
     /// and the space is simply there, as a swipe let go short already
     /// snaps back without moving (Motion.settle).
-    private func carry(_ browser: Browser, to offset: CGFloat, quick: Bool = false, then arrived: @escaping () -> Void) {
+    private func carry(_ browser: Browser, to offset: CGFloat, then arrived: @escaping () -> Void) {
         guard !Motion.reduced else { return arrived() }
-        withAnimation(quick ? .easeIn(duration: 0.12) : .easeOut(duration: 0.22), completionCriteria: .removed) {
+        withAnimation(.easeOut(duration: 0.22), completionCriteria: .removed) {
             browser.spaceSwipe = offset
         } completion: {
             arrived()

@@ -158,7 +158,7 @@ private struct SpaceRowDot: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { rect in
-            SpaceDrops.shared.place(space.id, at: rect, in: browser.window)
+            SpaceDrops.shared.place(space.id, at: rect, for: browser)
         }
         .animation(Motion.reduced ? nil : .easeOut(duration: 0.12), value: target)
         .contextMenu { menu }
@@ -189,6 +189,20 @@ private struct SpaceRowDot: View {
         if SpaceOrder.deletable(space.id) {
             Divider()
             Button("Delete “\(space.name)”…") { SpaceOrder.delete(space, from: browser) }
+        }
+    }
+}
+
+/// Fork: the column's foot measured as drawn — the space row, the doors and
+/// their margins — for the rows above to stop short of it. Worked out by
+/// hand from the parts it came out short, and tabs scrolled under the top
+/// half of the icons.
+struct FootTall: ViewModifier {
+    @Binding var tall: CGFloat
+
+    func body(content: Content) -> some View {
+        content.onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { height in
+            if abs(height - tall) > 0.5 { tall = height }
         }
     }
 }

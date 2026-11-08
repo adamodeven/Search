@@ -13,9 +13,10 @@ import SwiftUI
 // - Several picked tabs carried along the column go together: they land
 //   one after the other where the one in hand lands.
 //
-// Only this window's profile's spaces take tabs: a tab's page never goes
-// under another profile's sign-ins (Profiles.swift), so another profile's
-// icon doesn't light up and takes nothing.
+// Another profile's space takes them too, as in Arc: there the pages are
+// opened afresh under that profile's sign-ins — a page never carries one
+// profile's into another's (Profiles.swift) — and they close here. Pins
+// stay where they are.
 
 @MainActor
 extension Browser {
@@ -97,6 +98,32 @@ final class SpaceDrops: ObservableObject {
     private var spots: [ObjectIdentifier: [UUID: CGRect]] = [:]
     /// The icon a tab is being carried over now.
     @Published private(set) var over: UUID?
+    /// While several picked tabs are carried: the one in hand, and the
+    /// others, lifted out of the column until they land behind it.
+    @Published private(set) var lead: UUID?
+    @Published private(set) var lifted: Set<UUID> = []
+    private var release: Any?
+
+    /// The picked tabs other than `tab` lifted, the first time a drag of
+    /// it moves; put back at the button's release, however it ends.
+    func lift(_ browser: Browser, carrying tab: Tab) {
+        guard lead == nil else { return }
+        let others = browser.pickedOrOnly(tab).filter { $0.id != tab.id }
+        guard !others.isEmpty else { return }
+        lead = tab.id
+        withAnimation(Motion.quick) { lifted = Set(others.map(\.id)) }
+        release = NSEvent.addLocalMonitorForEvents(matching: .leftMouseUp) { event in
+            DispatchQueue.main.async { MainActor.assumeIsolated { SpaceDrops.shared.putDown() } }
+            return event
+        }
+    }
+
+    func putDown() {
+        if let release { NSEvent.removeMonitor(release) }
+        release = nil
+        lead = nil
+        withAnimation(Motion.quick) { lifted = [] }
+    }
     /// Held over an icon this long, the column turns to its space.
     private static let dwell: TimeInterval = 0.3
     private var waiting: DispatchWorkItem?
@@ -113,24 +140,36 @@ final class SpaceDrops: ObservableObject {
         let flipped = CGPoint(x: inWindow.x, y: content.bounds.height - inWindow.y)
         return spots[ObjectIdentifier(browser)]?.first { id, rect in
             rect.insetBy(dx: -2, dy: -4).contains(flipped)
-                && id != browser.spaceID && browser.spaces.contains { $0.id == id }
+                && id != browser.spaceID && browser.everySpace.contains { $0.id == id }
         }?.key
     }
 
     /// While a tab is carried: light the icon it is over, and held there,
     /// carry it into that space.
     func track(_ browser: Browser, carrying tab: Tab? = nil) {
+        // Taken over by a carry into a space: the drag it came from goes on
+        // telling where the pointer is until the button comes up, and would
+        // carry its tab — gone from here — over again.
+        guard !SpaceCarry.shared.active else { return }
+        if let tab { lift(browser, carrying: tab) }
         let now = browser.prefs.usesSpaces ? space(under: NSEvent.mouseLocation, for: browser) : nil
         guard now != over else { return }
-        over = now
+        guard let now, let tab else { return reset() }
+        hold(browser, carrying: browser.pickedOrOnly(tab), over: now)
+    }
+
+    /// Over `space`'s icon with these in hand: held there long enough, on
+    /// into that space with them.
+    func hold(_ browser: Browser, carrying tabs: [Tab], over space: UUID) {
+        over = space
         waiting?.cancel()
-        waiting = nil
-        guard let now, let tab else { return }
-        let work = DispatchWorkItem { [weak self, weak browser, weak tab] in
-            guard let self, let browser, let tab, self.over == now,
+        let work = DispatchWorkItem { [weak self, weak browser] in
+            guard let self, let browser, self.over == space,
                   NSEvent.pressedMouseButtons & 1 != 0 else { return }
             self.over = nil
-            SpaceCarry.shared.begin(browser.pickedOrOnly(tab), in: browser, to: now)
+            let here = tabs.filter { tab in browser.tabs.contains { $0 === tab } }
+            guard !here.isEmpty else { return }
+            SpaceCarry.shared.begin(here, in: browser, to: space)
         }
         waiting = work
         DispatchQueue.main.asyncAfter(deadline: .now() + SpaceDrops.dwell, execute: work)
@@ -149,7 +188,7 @@ final class SpaceDrops: ObservableObject {
               let id = space(under: NSEvent.mouseLocation, for: browser) else { return false }
         // After the drag has finished putting itself away.
         DispatchQueue.main.async {
-            browser.moveToSpace(tab, id) { browser.switchSpace(to: id) }
+            browser.carry(browser.pickedOrOnly(tab), to: id)
         }
         return true
     }
@@ -175,11 +214,27 @@ enum RowSpots {
 struct RowSpot: ViewModifier {
     let browser: Browser
     let tab: Tab
+    @ObservedObject private var drops = SpaceDrops.shared
 
     func body(content: Content) -> some View {
-        content.onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { rect in
-            RowSpots.place(tab.id, at: rect, for: browser)
-        }
+        content
+            .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { rect in
+                RowSpots.place(tab.id, at: rect, for: browser)
+            }
+            // Several picked tabs carried: the others lifted out with the
+            // one in hand, which says how many it carries.
+            .opacity(drops.lifted.contains(tab.id) ? 0.25 : 1)
+            .overlay(alignment: .trailing) {
+                if drops.lead == tab.id, !drops.lifted.isEmpty {
+                    Text("+\(drops.lifted.count)")
+                        .font(.system(size: 11, weight: .semibold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Palette.hover))
+                        .padding(.trailing, 28)
+                        .allowsHitTesting(false)
+                }
+            }
     }
 }
 
@@ -208,8 +263,10 @@ final class SpaceCarry {
         self.browser = browser
         carried = moving
         lastSpot = nil
-        browser.moveToSpace(moving, space) { [weak browser] in
-            browser?.switchSpace(to: space)
+        if let across = browser.carry(moving, to: space) {
+            // Another profile's: its window, with the pages opened afresh.
+            self.browser = across.window
+            carried = across.tabs
         }
         if monitor == nil {
             monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDragged, .leftMouseUp]) { event in
@@ -227,7 +284,7 @@ final class SpaceCarry {
             if let space = SpaceDrops.shared.space(under: NSEvent.mouseLocation, for: browser) {
                 // Let go over another icon: to the end of that space.
                 let going = carried.filter { tab in browser.tabs.contains { $0 === tab } }
-                browser.moveToSpace(going, space) { browser.switchSpace(to: space) }
+                browser.carry(going, to: space)
             } else {
                 settle(in: browser)
             }
@@ -236,8 +293,9 @@ final class SpaceCarry {
         }
         // Over another icon: held there, on to that space.
         let now = SpaceDrops.shared.space(under: NSEvent.mouseLocation, for: browser)
-        if let now, let first = carried.first(where: { tab in browser.tabs.contains { $0 === tab } }) {
-            if SpaceDrops.shared.over != now { SpaceDrops.shared.track(browser, carrying: first) }
+        let here = carried.filter { tab in browser.tabs.contains { $0 === tab } }
+        if let now, !here.isEmpty {
+            if SpaceDrops.shared.over != now { SpaceDrops.shared.hold(browser, carrying: here, over: now) }
             return
         }
         SpaceDrops.shared.reset()
@@ -269,6 +327,7 @@ final class SpaceCarry {
     }
 
     private func end() {
+        SpaceDrops.shared.putDown()
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
         label?.orderOut(nil)
@@ -352,5 +411,29 @@ extension Browser {
             return event
         }
         return true
+    }
+}
+
+extension Browser {
+    /// `moving` into the space `id`, the column following: moved, in this
+    /// profile; in another's, opened afresh in that profile's window at that
+    /// space and closed here, pins left where they are. Nil within the
+    /// profile; that window and the tabs opened there across.
+    @discardableResult
+    func carry(_ moving: [Tab], to id: UUID) -> (window: Browser, tabs: [Tab])? {
+        guard id != spaceID else { return nil }
+        if spaces.contains(where: { $0.id == id }) {
+            moveToSpace(moving, id) { [weak self] in self?.switchSpace(to: id) }
+            return nil
+        }
+        let going = moving.filter { $0.pin == nil && !$0.shy && !$0.bench && $0.address != nil }
+        let pages = going.compactMap { $0.address }
+        clearTabSelection()
+        Browsers.join(space: id, from: self)
+        guard let there = Browsers.front, there !== self, there.spaceID == id else { return nil }
+        let opened = pages.map { there.open($0, foreground: false, atEnd: true) }
+        if let first = opened.first { there.select(first) }
+        for each in going { close(each) }
+        return (there, opened)
     }
 }
